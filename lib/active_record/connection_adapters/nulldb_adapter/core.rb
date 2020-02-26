@@ -146,7 +146,13 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
                       File.join(NullDB.configuration.project_root, @schema_path)
                     end
       Kernel.load(schema_path)
+      # Kernel.load only works for adapter instance at ActiveRecord::Base.connection,
+      # any other instance remains without tables definitions.
+      # So...we just cache tables on first load and share between all instances. *shrug*
+      @@tables ||= @tables
     end
+
+    @tables = @@tables
 
     if table = @tables[table_name]
       table.columns.map do |col_def|
@@ -319,14 +325,14 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
       [
         col_def.name.to_s,
         col_def.default,
-        col_def.null.nil? || col_def.null # cast  [false, nil, true] => [false, true, true], other adapters default to null=true 
+        col_def.null.nil? || col_def.null # cast  [false, nil, true] => [false, true, true], other adapters default to null=true
       ]
     else
       [
         col_def.name.to_s,
         col_def.default,
         col_def.type,
-        col_def.null.nil? || col_def.null # cast  [false, nil, true] => [false, true, true], other adapters default to null=true 
+        col_def.null.nil? || col_def.null # cast  [false, nil, true] => [false, true, true], other adapters default to null=true
       ]
     end
   end
@@ -345,7 +351,7 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
   def register_types
     if ActiveRecord::VERSION::MAJOR < 5
       type_map.register_type(:primary_key, ActiveRecord::Type::Integer.new)
-    else      
+    else
       require 'active_model/type'
       ActiveRecord::Type.register(
         :primary_key,
